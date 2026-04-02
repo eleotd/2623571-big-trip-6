@@ -8,3 +8,4 @@ export default class NewTaskButtonView extends AbstractView {
   get template() {
     return createNewTaskButtonTemplate();
   }
+}

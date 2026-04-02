@@ -8,3 +8,4 @@ export default class TaskListView extends AbstractView {
   get template() {
     return createTaskListTemplate();
   }
+}
