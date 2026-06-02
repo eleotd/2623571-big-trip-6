@@ -18,9 +18,9 @@ const DelayLimits = {
 };
 
 export default class BoardPresenter {
-  #container = null;              // контейнер для отрисовки
-  #pointsStore = null;            // модель точек
-  #filterStore = null;            // модель фильтра
+  #container = null;
+  #pointsStore = null;
+  #filterStore = null;
 
   #sortWidget = null;
   #listContainer = new EventListView();
