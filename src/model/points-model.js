@@ -3,14 +3,14 @@ import Observable from '../framework/observable.js';
 import {UpdateType} from '../const.js';
 
 export default class PointsModel extends Observable {
-  #apiService = null;        // сервис для запросов к API
-  #routePoints = [];         // список точек маршрута
-  #cityDestinations = [];    // список направлений (городов)
-  #availableOffers = [];     // список доступных предложений
+  #apiService = null;
+  #routePoints = [];
+  #cityDestinations = [];
+  #availableOffers = [];
 
   /**
    * @param {Object} config - настройки модели
-   * @param {PointsApiService} config.pointsApiService - API сервис
+   * @param {PointsApiService} config.pointsApiService - APi сервис
    */
   constructor({pointsApiService}) {
     super();
