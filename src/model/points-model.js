@@ -10,7 +10,7 @@ export default class PointsModel extends Observable {
 
   /**
    * @param {Object} config - настройки модели
-   * @param {PointsApiService} config.pointsApiService - API сервис
+   * @param {PointsApiService} config.pointsApiService - APi сервис
    */
   constructor({pointsApiService}) {
     super();
