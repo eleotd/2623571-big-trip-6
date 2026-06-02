@@ -5,11 +5,11 @@ import {FilterType, UpdateType} from '../const.js';
 import {filter} from '../utils/filter.js';
 
 export default class FilterPresenter {
-  #container = null;      // контейнер для фильтров
-  #filterStore = null;    // модель фильтра
-  #pointsStore = null;    // модель точек
+  #container = null;
+  #filterStore = null;
+  #pointsStore = null;
 
-  #filterWidget = null;   // компонент фильтра
+  #filterWidget = null;
 
   constructor({filterContainer, filterModel, pointsModel}) {
     this.#container = filterContainer;

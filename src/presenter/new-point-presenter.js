@@ -4,12 +4,12 @@ import EditPointView from '../view/edit-point-view.js';
 import {UserAction, UpdateType} from '../const.js';
 
 export default class NewPointPresenter {
-  #container = null;           // контейнер для вставки формы
-  #onDataUpdate = null;        // колбэк при отправке формы
-  #editForm = null;            // компонент формы редактирования
-  #onClose = null;             // колбэк при закрытии
-  #citiesList = null;          // список направлений
-  #servicesList = null;        // список предложений
+  #container = null;
+  #onDataUpdate = null;
+  #editForm = null;
+  #onClose = null;
+  #citiesList = null;
+  #servicesList = null;
 
   constructor(pointListContainer, onUserAction) {
     this.#container = pointListContainer;
