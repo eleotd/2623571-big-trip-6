@@ -1,15 +1,19 @@
+// Модель для управления текущим типом фильтра
 import Observable from '../framework/observable.js';
 import {FilterType} from '../const.js';
 
 export default class FilterModel extends Observable {
-  #filter = FilterType.ALL;
+  // Текущий выбранный фильтр (по умолчанию — всё)
+  #currentFilter = FilterType.EVERYTHING;
 
+  // Геттер возвращает активный фильтр
   get filter() {
-    return this.#filter;
+    return this.#currentFilter;
   }
 
-  setFilter(updateType, filter) {
-    this.#filter = filter;
-    this._notify(updateType, filter);
+  // Обновляет фильтр и уведомляет подписчиков
+  setFilter(updateType, newFilter) {
+    this.#currentFilter = newFilter;
+    this._notify(updateType, newFilter);
   }
 }

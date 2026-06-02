@@ -1,48 +1,71 @@
-import {render} from './framework/render.js';
-import NewTaskButtonView from './view/new-task-button-view.js';
+// Главный файл приложения — инициализация презентеров и моделей
 import BoardPresenter from './presenter/board-presenter.js';
 import FilterPresenter from './presenter/filter-presenter.js';
-import TasksModel from './model/tasks-model.js';
+import TripInfoPresenter from './presenter/trip-info-presenter.js';
+import PointsModel from './model/points-model.js';
 import FilterModel from './model/filter-model.js';
-import TasksApiService from './tasks-api-service.js';
+import PointsApiService from './points-api-service.js';
 
-const AUTHORIZATION = 'Basic hS2sfS44wcl1sa2j';
-const END_POINT = 'https://22.objects.pages.academy/task-manager';
+// Настройки подключения к API
+const AUTH_KEY = `Basic ${Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)}`;
+const API_BASE_URL = 'https://24.objects.htmlacademy.pro/big-trip';
 
-const siteMainElement = document.querySelector('.main');
-const siteHeaderElement = siteMainElement.querySelector('.main__control');
+// DOM-элементы
+const mainContainer = document.querySelector('.page-main');
+const headerContainer = document.querySelector('.page-header');
+const tripHeaderSection = headerContainer.querySelector('.trip-main');
+const filtersContainer = headerContainer.querySelector('.trip-controls__filters');
+const eventsContainer = mainContainer.querySelector('.trip-events');
 
-const tasksModel = new TasksModel({
-  tasksApiService: new TasksApiService(END_POINT, AUTHORIZATION)
+// Инициализация моделей
+const pointsStore = new PointsModel({
+  pointsApiService: new PointsApiService(API_BASE_URL, AUTH_KEY)
 });
-const filterModel = new FilterModel();
-const boardPresenter = new BoardPresenter({
-  boardContainer: siteMainElement,
-  tasksModel,
-  filterModel,
-  onNewTaskDestroy: handleNewTaskFormClose
-});
-const filterPresenter = new FilterPresenter({
-  filterContainer: siteMainElement,
-  filterModel,
-  tasksModel
-});
-const newTaskButtonComponent = new NewTaskButtonView({
-  onClick: handleNewTaskButtonClick
+const filtersStore = new FilterModel();
+
+// Презентер шапки с информацией о маршруте
+const headerInfoPresenter = new TripInfoPresenter({
+  tripInfoContainer: tripHeaderSection,
+  pointsModel: pointsStore,
 });
 
-function handleNewTaskFormClose() {
-  newTaskButtonComponent.element.disabled = false;
-}
+// Презентер доски с точками
+const boardViewPresenter = new BoardPresenter({
+  boardContainer: eventsContainer,
+  pointsModel: pointsStore,
+  filterModel: filtersStore,
+});
 
-function handleNewTaskButtonClick() {
-  boardPresenter.createTask();
-  newTaskButtonComponent.element.disabled = true;
-}
+// Презентер фильтров
+const filterBarPresenter = new FilterPresenter({
+  filterContainer: filtersContainer,
+  filterModel: filtersStore,
+  pointsModel: pointsStore,
+});
 
-filterPresenter.init();
-boardPresenter.init();
-tasksModel.init()
+// Колбэк при закрытии формы создания новой точки
+const onNewPointFormClosed = () => {
+  document.querySelector('.trip-main__event-add-btn').disabled = false;
+};
+
+// Обработчик клика по кнопке "New Event"
+const onAddButtonClick = () => {
+  boardViewPresenter.createPoint(onNewPointFormClosed);
+  document.querySelector('.trip-main__event-add-btn').disabled = true;
+};
+
+// Блокируем кнопку создания до загрузки данных
+const addEventButton = document.querySelector('.trip-main__event-add-btn');
+addEventButton.disabled = true;
+addEventButton.addEventListener('click', onAddButtonClick);
+
+// Запуск презентеров и загрузка данных
+headerInfoPresenter.init();
+filterBarPresenter.init();
+boardViewPresenter.init();
+
+// Загрузка данных с сервера
+pointsStore.init()
   .finally(() => {
-    render(newTaskButtonComponent, siteHeaderElement);
+    addEventButton.disabled = false;
   });

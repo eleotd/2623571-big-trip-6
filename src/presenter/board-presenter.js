@@ -1,267 +1,241 @@
-import {render, RenderPosition, remove} from '../framework/render.js';
-import UiBlocker from '../framework/ui-blocker/ui-blocker.js';
-import BoardView from '../view/board-view.js';
+// Презентер доски с точками маршрута, сортировкой и фильтрацией
 import SortView from '../view/sort-view.js';
-import TaskListView from '../view/task-list-view.js';
-import LoadMoreButtonView from '../view/load-more-button-view.js';
-import NoTaskView from '../view/no-task-view.js';
+import EventListView from '../view/event-list-view.js';
+import ListEmptyView from '../view/list-empty-view.js';
 import LoadingView from '../view/loading-view.js';
-import TaskPresenter from './task-presenter.js';
-import NewTaskPresenter from './new-task-presenter.js';
-import {sortTaskUp, sortTaskDown} from '../utils/task.js';
+import FailedLoadDataView from '../view/failed-load-data-view.js';
+import PointPresenter from './point-presenter.js';
+import NewPointPresenter from './new-point-presenter.js';
+import {render, remove} from '../framework/render.js';
+import {SortType, UserAction, UpdateType, FilterType} from '../const.js';
+import {sortPointDay, sortPointTime, sortPointPrice} from '../utils/sort.js';
 import {filter} from '../utils/filter.js';
-import {SortType, UpdateType, UserAction, FilterType} from '../const.js';
+import UiBlocker from '../framework/ui-blocker/ui-blocker.js';
 
-const TASK_COUNT_PER_STEP = 8;
-const TimeLimit = {
-  LOWER_LIMIT: 350,
-  UPPER_LIMIT: 1000,
+const DelayLimits = {
+  MIN: 350,
+  MAX: 1000,
 };
 
 export default class BoardPresenter {
-  #boardContainer = null;
-  #tasksModel = null;
-  #filterModel = null;
+  #container = null;              // контейнер для отрисовки
+  #pointsStore = null;            // модель точек
+  #filterStore = null;            // модель фильтра
 
-  #boardComponent = new BoardView();
-  #taskListComponent = new TaskListView();
-  #loadingComponent = new LoadingView();
-  #loadMoreButtonComponent = null;
-  #sortComponent = null;
-  #noTaskComponent = null;
+  #sortWidget = null;
+  #listContainer = new EventListView();
+  #emptyMessage = null;
+  #spinner = new LoadingView();
+  #errorMessage = new FailedLoadDataView();
 
-  #renderedTaskCount = TASK_COUNT_PER_STEP;
-  #taskPresenters = new Map();
-  #newTaskPresenter = null;
-  #currentSortType = SortType.DEFAULT;
-  #filterType = FilterType.ALL;
-  #isLoading = true;
-  #uiBlocker = new UiBlocker({
-    lowerLimit: TimeLimit.LOWER_LIMIT,
-    upperLimit: TimeLimit.UPPER_LIMIT
+  #presentersMap = new Map();
+  #newPointHandler = null;
+  #activeSort = SortType.DAY;
+  #activeFilter = FilterType.EVERYTHING;
+  #dataLoading = true;
+  #hasError = false;
+  #blocker = new UiBlocker({
+    lowerLimit: DelayLimits.MIN,
+    upperLimit: DelayLimits.MAX
   });
 
-  constructor({boardContainer, tasksModel, filterModel, onNewTaskDestroy}) {
-    this.#boardContainer = boardContainer;
-    this.#tasksModel = tasksModel;
-    this.#filterModel = filterModel;
+  constructor({boardContainer, pointsModel, filterModel}) {
+    this.#container = boardContainer;
+    this.#pointsStore = pointsModel;
+    this.#filterStore = filterModel;
 
-    this.#newTaskPresenter = new NewTaskPresenter({
-      taskListContainer: this.#taskListComponent.element,
-      onDataChange: this.#handleViewAction,
-      onDestroy: onNewTaskDestroy
-    });
+    this.#newPointHandler = new NewPointPresenter(this.#listContainer.element, this.#onUserAction);
 
-    this.#tasksModel.addObserver(this.#handleModelEvent);
-    this.#filterModel.addObserver(this.#handleModelEvent);
+    this.#pointsStore.addObserver(this.#onModelChange);
+    this.#filterStore.addObserver(this.#onModelChange);
   }
 
-  get tasks() {
-    this.#filterType = this.#filterModel.filter;
-    const tasks = this.#tasksModel.tasks;
-    const filteredTasks = filter[this.#filterType](tasks);
+  // Геттеры для внешнего доступа
+  get points() {
+    this.#activeFilter = this.#filterStore.filter;
+    const rawPoints = this.#pointsStore.points;
+    const filtered = filter[this.#activeFilter](rawPoints);
 
-    switch (this.#currentSortType) {
-      case SortType.DATE_UP:
-        return filteredTasks.sort(sortTaskUp);
-      case SortType.DATE_DOWN:
-        return filteredTasks.sort(sortTaskDown);
+    switch (this.#activeSort) {
+      case SortType.TIME:
+        return filtered.sort(sortPointTime);
+      case SortType.PRICE:
+        return filtered.sort(sortPointPrice);
+      default:
+        return filtered.sort(sortPointDay);
     }
+  }
 
-    return filteredTasks;
+  get destinations() {
+    return this.#pointsStore.destinations;
+  }
+
+  get offers() {
+    return this.#pointsStore.offers;
   }
 
   init() {
-    this.#renderBoard();
+    this.#renderUI();
   }
 
-  createTask() {
-    this.#currentSortType = SortType.DEFAULT;
-    this.#filterModel.setFilter(UpdateType.MAJOR, FilterType.ALL);
-    this.#newTaskPresenter.init();
+  createPoint(callback) {
+    this.#activeSort = SortType.DAY;
+    this.#filterStore.setFilter(UpdateType.MAJOR, FilterType.EVERYTHING);
+    this.#newPointHandler.init(callback, this.destinations, this.offers);
   }
 
-  #handleLoadMoreButtonClick = () => {
-    const taskCount = this.tasks.length;
-    const newRenderedTaskCount = Math.min(taskCount, this.#renderedTaskCount + TASK_COUNT_PER_STEP);
-    const tasks = this.tasks.slice(this.#renderedTaskCount, newRenderedTaskCount);
-
-    this.#renderTasks(tasks);
-    this.#renderedTaskCount = newRenderedTaskCount;
-
-    if (this.#renderedTaskCount >= taskCount) {
-      remove(this.#loadMoreButtonComponent);
-    }
+  // Закрываем все открытые формы
+  #closeAllEditors = () => {
+    this.#newPointHandler.destroy();
+    this.#presentersMap.forEach((presenter) => presenter.resetView());
   };
 
-  #handleModeChange = () => {
-    this.#newTaskPresenter.destroy();
-    this.#taskPresenters.forEach((presenter) => presenter.resetView());
-  };
+  // Обработка действий пользователя (добавление/изменение/удаление)
+  #onUserAction = async (action, changeType, data) => {
+    this.#blocker.block();
 
-  #handleViewAction = async (actionType, updateType, update) => {
-    this.#uiBlocker.block();
-
-    switch (actionType) {
-      case UserAction.UPDATE_TASK:
-        this.#taskPresenters.get(update.id).setSaving();
+    switch (action) {
+      case UserAction.UPDATE_POINT:
+        this.#presentersMap.get(data.id).setSaving();
         try {
-          await this.#tasksModel.updateTask(updateType, update);
+          await this.#pointsStore.updatePoint(changeType, data);
         } catch(err) {
-          this.#taskPresenters.get(update.id).setAborting();
+          this.#presentersMap.get(data.id).setAborting();
         }
         break;
-      case UserAction.ADD_TASK:
-        this.#newTaskPresenter.setSaving();
+      case UserAction.ADD_POINT:
+        this.#newPointHandler.setSaving();
         try {
-          await this.#tasksModel.addTask(updateType, update);
+          await this.#pointsStore.addPoint(changeType, data);
         } catch(err) {
-          this.#newTaskPresenter.setAborting();
+          this.#newPointHandler.setAborting();
         }
         break;
-      case UserAction.DELETE_TASK:
-        this.#taskPresenters.get(update.id).setDeleting();
+      case UserAction.DELETE_POINT:
+        this.#presentersMap.get(data.id).setDeleting();
         try {
-          await this.#tasksModel.deleteTask(updateType, update);
+          await this.#pointsStore.deletePoint(changeType, data);
         } catch(err) {
-          this.#taskPresenters.get(update.id).setAborting();
+          this.#presentersMap.get(data.id).setAborting();
         }
         break;
     }
 
-    this.#uiBlocker.unblock();
+    this.#blocker.unblock();
   };
 
-  #handleModelEvent = (updateType, data) => {
+  // Реакция на изменения в моделях
+  #onModelChange = (updateType, payload) => {
     switch (updateType) {
       case UpdateType.PATCH:
-        this.#taskPresenters.get(data.id).init(data);
+        this.#presentersMap.get(payload.id).init(payload, this.destinations, this.offers);
         break;
       case UpdateType.MINOR:
         this.#clearBoard();
-        this.#renderBoard();
+        this.#renderUI();
         break;
       case UpdateType.MAJOR:
-        this.#clearBoard({resetRenderedTaskCount: true, resetSortType: true});
-        this.#renderBoard();
+        this.#clearBoard({resetSortFlag: true});
+        this.#renderUI();
         break;
       case UpdateType.INIT:
-        this.#isLoading = false;
-        remove(this.#loadingComponent);
-        this.#renderBoard();
+        this.#dataLoading = false;
+        if (payload && payload.isError) {
+          this.#hasError = true;
+        }
+        remove(this.#spinner);
+        this.#renderUI();
         break;
     }
   };
 
-  #handleSortTypeChange = (sortType) => {
-    if (this.#currentSortType === sortType) {
+  // Переключение сортировки
+  #onSortChange = (newSort) => {
+    if (this.#activeSort === newSort) {
       return;
     }
-
-    this.#currentSortType = sortType;
-    this.#clearBoard({resetRenderedTaskCount: true});
-    this.#renderBoard();
+    this.#activeSort = newSort;
+    this.#clearBoard();
+    this.#renderUI();
   };
 
-  #renderSort() {
-    this.#sortComponent = new SortView({
-      currentSortType: this.#currentSortType,
-      onSortTypeChange: this.#handleSortTypeChange
+  // Отрисовка одной точки
+  #renderSinglePoint(item) {
+    const presenter = new PointPresenter(this.#listContainer.element, this.#onUserAction, this.#closeAllEditors);
+    presenter.init(item, this.destinations, this.offers);
+    this.#presentersMap.set(item.id, presenter);
+  }
+
+  // Отрисовка всех точек
+  #renderAllPoints(items) {
+    items.forEach((item) => this.#renderSinglePoint(item));
+  }
+
+  #renderEmptyList() {
+    this.#emptyMessage = new ListEmptyView(this.#activeFilter);
+    render(this.#emptyMessage, this.#container);
+  }
+
+  #renderSpinner() {
+    render(this.#spinner, this.#container);
+  }
+
+  #renderError() {
+    render(this.#errorMessage, this.#container);
+  }
+
+  #renderSortBar() {
+    this.#sortWidget = new SortView({
+      currentSortType: this.#activeSort,
+      onSortTypeChange: this.#onSortChange
     });
-
-    render(this.#sortComponent, this.#boardComponent.element, RenderPosition.AFTERBEGIN);
+    render(this.#sortWidget, this.#container);
   }
 
-  #renderTask(task) {
-    const taskPresenter = new TaskPresenter({
-      taskListContainer: this.#taskListComponent.element,
-      onDataChange: this.#handleViewAction,
-      onModeChange: this.#handleModeChange
-    });
-    taskPresenter.init(task);
-    this.#taskPresenters.set(task.id, taskPresenter);
+  #renderListArea() {
+    render(this.#listContainer, this.#container);
   }
 
-  #renderTasks(tasks) {
-    tasks.forEach((task) => this.#renderTask(task));
-  }
+  // Очистка доски
+  #clearBoard({resetSortFlag = false} = {}) {
+    this.#newPointHandler.destroy();
+    this.#presentersMap.forEach((presenter) => presenter.destroy());
+    this.#presentersMap.clear();
 
-  #renderLoading() {
-    render(this.#loadingComponent, this.#boardComponent.element, RenderPosition.AFTERBEGIN);
-  }
-
-  #renderNoTasks() {
-    this.#noTaskComponent = new NoTaskView({
-      filterType: this.#filterType
-    });
-
-    render(this.#noTaskComponent, this.#boardComponent.element, RenderPosition.AFTERBEGIN);
-  }
-
-  #renderLoadMoreButton() {
-    this.#loadMoreButtonComponent = new LoadMoreButtonView({
-      onClick: this.#handleLoadMoreButtonClick
-    });
-
-    render(this.#loadMoreButtonComponent, this.#boardComponent.element);
-  }
-
-  #clearBoard({resetRenderedTaskCount = false, resetSortType = false} = {}) {
-    const taskCount = this.tasks.length;
-
-    this.#newTaskPresenter.destroy();
-    this.#taskPresenters.forEach((presenter) => presenter.destroy());
-    this.#taskPresenters.clear();
-
-    remove(this.#sortComponent);
-    remove(this.#loadingComponent);
-    remove(this.#loadMoreButtonComponent);
-
-    if (this.#noTaskComponent) {
-      remove(this.#noTaskComponent);
+    remove(this.#sortWidget);
+    remove(this.#spinner);
+    remove(this.#errorMessage);
+    if (this.#emptyMessage) {
+      remove(this.#emptyMessage);
     }
 
-    if (resetRenderedTaskCount) {
-      this.#renderedTaskCount = TASK_COUNT_PER_STEP;
-    } else {
-      // На случай, если перерисовка доски вызвана
-      // уменьшением количества задач (например, удаление или перенос в архив)
-      // нужно скорректировать число показанных задач
-      this.#renderedTaskCount = Math.min(taskCount, this.#renderedTaskCount);
-    }
-
-    if (resetSortType) {
-      this.#currentSortType = SortType.DEFAULT;
+    if (resetSortFlag) {
+      this.#activeSort = SortType.DAY;
     }
   }
 
-  #renderBoard() {
-    render(this.#boardComponent, this.#boardContainer);
-
-    if (this.#isLoading) {
-      this.#renderLoading();
+  // Главный метод отрисовки
+  #renderUI() {
+    if (this.#dataLoading) {
+      this.#renderSpinner();
       return;
     }
 
-    const tasks = this.tasks;
-    const taskCount = tasks.length;
-
-    if (taskCount === 0) {
-      this.#renderNoTasks();
+    if (this.#hasError) {
+      this.#renderError();
       return;
     }
 
-    this.#renderSort();
-    render(this.#taskListComponent, this.#boardComponent.element);
+    const items = this.points;
+    const total = items.length;
 
-    // Теперь, когда #renderBoard рендерит доску не только на старте,
-    // но и по ходу работы приложения, нужно заменить
-    // константу TASK_COUNT_PER_STEP на свойство #renderedTaskCount,
-    // чтобы в случае перерисовки сохранить N-показанных карточек
-    this.#renderTasks(tasks.slice(0, Math.min(taskCount, this.#renderedTaskCount)));
-
-    if (taskCount > this.#renderedTaskCount) {
-      this.#renderLoadMoreButton();
+    if (total === 0) {
+      this.#renderEmptyList();
+      return;
     }
+
+    this.#renderSortBar();
+    this.#renderListArea();
+    this.#renderAllPoints(items);
   }
 }

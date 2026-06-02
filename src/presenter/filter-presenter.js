@@ -1,61 +1,65 @@
-import {render, replace, remove} from '../framework/render.js';
+// Презентер блока фильтров
 import FilterView from '../view/filter-view.js';
-import {filter} from '../utils/filter.js';
+import {render, replace, remove} from '../framework/render.js';
 import {FilterType, UpdateType} from '../const.js';
+import {filter} from '../utils/filter.js';
 
 export default class FilterPresenter {
-  #filterContainer = null;
-  #filterModel = null;
-  #tasksModel = null;
+  #container = null;      // контейнер для фильтров
+  #filterStore = null;    // модель фильтра
+  #pointsStore = null;    // модель точек
 
-  #filterComponent = null;
+  #filterWidget = null;   // компонент фильтра
 
-  constructor({filterContainer, filterModel, tasksModel}) {
-    this.#filterContainer = filterContainer;
-    this.#filterModel = filterModel;
-    this.#tasksModel = tasksModel;
+  constructor({filterContainer, filterModel, pointsModel}) {
+    this.#container = filterContainer;
+    this.#filterStore = filterModel;
+    this.#pointsStore = pointsModel;
 
-    this.#tasksModel.addObserver(this.#handleModelEvent);
-    this.#filterModel.addObserver(this.#handleModelEvent);
+    this.#pointsStore.addObserver(this.#onDataChange);
+    this.#filterStore.addObserver(this.#onDataChange);
   }
 
+  // Получение списка фильтров с количеством подходящих точек
   get filters() {
-    const tasks = this.#tasksModel.tasks;
+    const allPoints = this.#pointsStore.points;
 
-    return Object.values(FilterType).map((type) => ({
-      type,
-      count: filter[type](tasks).length
+    return Object.values(FilterType).map((filterType) => ({
+      type: filterType,
+      count: filter[filterType](allPoints).length,
     }));
   }
 
+  // Инициализация или обновление фильтров
   init() {
-    const filters = this.filters;
-    const prevFilterComponent = this.#filterComponent;
+    const availableFilters = this.filters;
+    const previousComponent = this.#filterWidget;
 
-    this.#filterComponent = new FilterView({
-      filters,
-      currentFilterType: this.#filterModel.filter,
-      onFilterTypeChange: this.#handleFilterTypeChange
+    this.#filterWidget = new FilterView({
+      filters: availableFilters,
+      currentFilterType: this.#filterStore.filter,
+      onFilterTypeChange: this.#onFilterChange
     });
 
-    if (prevFilterComponent === null) {
-      render(this.#filterComponent, this.#filterContainer);
+    if (previousComponent === null) {
+      render(this.#filterWidget, this.#container);
       return;
     }
 
-    replace(this.#filterComponent, prevFilterComponent);
-    remove(prevFilterComponent);
+    replace(this.#filterWidget, previousComponent);
+    remove(previousComponent);
   }
 
-  #handleModelEvent = () => {
+  // Реакция на изменения в моделях
+  #onDataChange = () => {
     this.init();
   };
 
-  #handleFilterTypeChange = (filterType) => {
-    if (this.#filterModel.filter === filterType) {
+  // Переключение типа фильтра
+  #onFilterChange = (selectedType) => {
+    if (this.#filterStore.filter === selectedType) {
       return;
     }
-
-    this.#filterModel.setFilter(UpdateType.MAJOR, filterType);
+    this.#filterStore.setFilter(UpdateType.MAJOR, selectedType);
   };
 }
