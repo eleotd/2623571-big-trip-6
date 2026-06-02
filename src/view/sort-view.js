@@ -1,11 +1,13 @@
+// Представление панели сортировки
 import AbstractView from '../framework/view/abstract-view.js';
 import {SortType} from '../const.js';
 
-function createSortTemplate(currentSortType) {
-  return (
-    `<form class="trip-events__trip-sort  trip-sort" action="#" method="get">
+// Генерация HTML формы сортировки
+function buildSortFormMarkup(activeSortType) {
+  return `
+    <form class="trip-events__trip-sort  trip-sort" action="#" method="get">
       <div class="trip-sort__item  trip-sort__item--day">
-        <input id="sort-day" class="trip-sort__input  visually-hidden" type="radio" name="trip-sort" value="sort-day" data-sort-type="${SortType.DAY}" ${currentSortType === SortType.DAY ? 'checked' : ''}>
+        <input id="sort-day" class="trip-sort__input  visually-hidden" type="radio" name="trip-sort" value="sort-day" data-sort-type="${SortType.DAY}" ${activeSortType === SortType.DAY ? 'checked' : ''}>
         <label class="trip-sort__btn" for="sort-day" style="user-select: none" draggable="false">Day</label>
       </div>
 
@@ -15,12 +17,12 @@ function createSortTemplate(currentSortType) {
       </div>
 
       <div class="trip-sort__item  trip-sort__item--time">
-        <input id="sort-time" class="trip-sort__input  visually-hidden" type="radio" name="trip-sort" value="sort-time" data-sort-type="${SortType.TIME}" ${currentSortType === SortType.TIME ? 'checked' : ''}>
+        <input id="sort-time" class="trip-sort__input  visually-hidden" type="radio" name="trip-sort" value="sort-time" data-sort-type="${SortType.TIME}" ${activeSortType === SortType.TIME ? 'checked' : ''}>
         <label class="trip-sort__btn" for="sort-time" style="user-select: none" draggable="false">Time</label>
       </div>
 
       <div class="trip-sort__item  trip-sort__item--price">
-        <input id="sort-price" class="trip-sort__input  visually-hidden" type="radio" name="trip-sort" value="sort-price" data-sort-type="${SortType.PRICE}" ${currentSortType === SortType.PRICE ? 'checked' : ''}>
+        <input id="sort-price" class="trip-sort__input  visually-hidden" type="radio" name="trip-sort" value="sort-price" data-sort-type="${SortType.PRICE}" ${activeSortType === SortType.PRICE ? 'checked' : ''}>
         <label class="trip-sort__btn" for="sort-price" style="user-select: none" draggable="false">Price</label>
       </div>
 
@@ -28,32 +30,32 @@ function createSortTemplate(currentSortType) {
         <input id="sort-offer" class="trip-sort__input  visually-hidden" type="radio" name="trip-sort" value="sort-offer" data-sort-type="${SortType.OFFER}" disabled>
         <label class="trip-sort__btn" for="sort-offer" style="user-select: none" draggable="false">Offers</label>
       </div>
-    </form>`
-  );
+    </form>`;
 }
 
 export default class SortView extends AbstractView {
-  #handleSortTypeChange = null;
-  #currentSortType = null;
+  #currentSort = null;
+  #onSortSelect = null;
 
   constructor({currentSortType, onSortTypeChange}) {
     super();
-    this.#currentSortType = currentSortType;
-    this.#handleSortTypeChange = onSortTypeChange;
+    this.#currentSort = currentSortType;
+    this.#onSortSelect = onSortTypeChange;
 
-    this.element.addEventListener('change', this.#sortTypeChangeHandler);
+    this.element.addEventListener('change', this.#onSortChange);
   }
 
   get template() {
-    return createSortTemplate(this.#currentSortType);
+    return buildSortFormMarkup(this.#currentSort);
   }
 
-  #sortTypeChangeHandler = (evt) => {
+  // Обработчик смены типа сортировки
+  #onSortChange = (evt) => {
     if (evt.target.tagName !== 'INPUT') {
       return;
     }
 
     evt.preventDefault();
-    this.#handleSortTypeChange(evt.target.dataset.sortType);
+    this.#onSortSelect(evt.target.dataset.sortType);
   };
 }

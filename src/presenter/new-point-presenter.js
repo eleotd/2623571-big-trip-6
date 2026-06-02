@@ -1,88 +1,97 @@
+// Презентер для создания новой точки маршрута
 import {remove, render, RenderPosition} from '../framework/render.js';
 import EditPointView from '../view/edit-point-view.js';
 import {UserAction, UpdateType} from '../const.js';
 
 export default class NewPointPresenter {
-  #pointListContainer = null;
-  #changeData = null;
-  #pointEditComponent = null;
-  #destroyCallback = null;
-  #destinations = null;
-  #offers = null;
+  #container = null;           // контейнер для вставки формы
+  #onDataUpdate = null;        // колбэк при отправке формы
+  #editForm = null;            // компонент формы редактирования
+  #onClose = null;             // колбэк при закрытии
+  #citiesList = null;          // список направлений
+  #servicesList = null;        // список предложений
 
-  constructor(pointListContainer, changeData) {
-    this.#pointListContainer = pointListContainer;
-    this.#changeData = changeData;
+  constructor(pointListContainer, onUserAction) {
+    this.#container = pointListContainer;
+    this.#onDataUpdate = onUserAction;
   }
 
-  init(callback, destinations, offers) {
-    this.#destroyCallback = callback;
-    this.#destinations = destinations;
-    this.#offers = offers;
+  // Инициализация формы создания
+  init(closeCallback, destinations, offers) {
+    this.#onClose = closeCallback;
+    this.#citiesList = destinations;
+    this.#servicesList = offers;
 
-    if (this.#pointEditComponent !== null) {
+    // Если форма уже открыта — не создаём дубликат
+    if (this.#editForm !== null) {
       return;
     }
 
-    this.#pointEditComponent = new EditPointView({
-      pointDestinations: this.#destinations,
-      pointOffers: this.#offers,
-      onFormSubmit: this.#handleFormSubmit,
-      onDeleteClick: this.#handleDeleteClick
+    this.#editForm = new EditPointView({
+      pointDestinations: this.#citiesList,
+      pointOffers: this.#servicesList,
+      onFormSubmit: this.#onSubmit,
+      onDeleteClick: this.#onCancel
     });
 
-    render(this.#pointEditComponent, this.#pointListContainer, RenderPosition.AFTERBEGIN);
+    render(this.#editForm, this.#container, RenderPosition.AFTERBEGIN);
 
-    document.addEventListener('keydown', this.#escKeyDownHandler);
+    document.addEventListener('keydown', this.#onKeyPress);
   }
 
+  // Закрытие формы
   destroy() {
-    if (this.#pointEditComponent === null) {
+    if (this.#editForm === null) {
       return;
     }
 
-    this.#destroyCallback?.();
+    this.#onClose?.();
 
-    remove(this.#pointEditComponent);
-    this.#pointEditComponent = null;
+    remove(this.#editForm);
+    this.#editForm = null;
 
-    document.removeEventListener('keydown', this.#escKeyDownHandler);
+    document.removeEventListener('keydown', this.#onKeyPress);
   }
 
+  // Блокировка формы во время сохранения
   setSaving() {
-    this.#pointEditComponent.updateElement({
+    this.#editForm.updateElement({
       isDisabled: true,
       isSaving: true,
     });
   }
 
+  // Сброс состояния формы при ошибке (с "тряской")
   setAborting() {
-    const resetFormState = () => {
-      this.#pointEditComponent.updateElement({
+    const resetState = () => {
+      this.#editForm.updateElement({
         isDisabled: false,
         isSaving: false,
         isDeleting: false,
       });
     };
 
-    this.#pointEditComponent.shake(resetFormState);
+    this.#editForm.shake(resetState);
   }
 
-  #handleFormSubmit = (point) => {
-    this.#changeData(
+  // Отправка формы
+  #onSubmit = (formData) => {
+    this.#onDataUpdate(
       UserAction.ADD_POINT,
       UpdateType.MINOR,
-      point,
+      formData,
     );
   };
 
-  #handleDeleteClick = () => {
+  // Отмена (закрытие формы)
+  #onCancel = () => {
     this.destroy();
   };
 
-  #escKeyDownHandler = (evt) => {
-    if (evt.key === 'Escape' || evt.key === 'Esc') {
-      evt.preventDefault();
+  // Обработчик нажатия Escape
+  #onKeyPress = (event) => {
+    if (event.key === 'Escape' || event.key === 'Esc') {
+      event.preventDefault();
       this.destroy();
     }
   };

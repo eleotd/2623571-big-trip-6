@@ -1,28 +1,30 @@
+// Представление сообщения "нет точек" для разных типов фильтров
 import AbstractView from '../framework/view/abstract-view.js';
 import {FilterType} from '../const.js';
 
-const NoPointsTextType = {
+// Текст сообщений в зависимости от фильтра
+const EmptyMessageByFilter = {
   [FilterType.EVERYTHING]: 'Click New Event to create your first point',
   [FilterType.FUTURE]: 'There are no future events now',
   [FilterType.PRESENT]: 'There are no present events now',
   [FilterType.PAST]: 'There are no past events now',
 };
 
-function createListEmptyTemplate(filterType) {
-  const noPointTextValue = NoPointsTextType[filterType];
-
-  return `<p class="trip-events__msg">${noPointTextValue}</p>`;
+// Генерация HTML пустого списка
+function buildEmptyListMarkup(activeFilter) {
+  const message = EmptyMessageByFilter[activeFilter];
+  return `<p class="trip-events__msg">${message}</p>`;
 }
 
 export default class ListEmptyView extends AbstractView {
-  #filterType = null;
+  #currentFilter = null;
 
   constructor(filterType) {
     super();
-    this.#filterType = filterType;
+    this.#currentFilter = filterType;
   }
 
   get template() {
-    return createListEmptyTemplate(this.#filterType);
+    return buildEmptyListMarkup(this.#currentFilter);
   }
 }

@@ -1,182 +1,202 @@
+// Презентер одной точки маршрута (карточка + форма редактирования)
 import PointView from '../view/point-view.js';
 import EditPointView from '../view/edit-point-view.js';
 import {render, replace, remove} from '../framework/render.js';
 import {UserAction, UpdateType} from '../const.js';
 import dayjs from 'dayjs';
 
-const Mode = {
-  DEFAULT: 'DEFAULT',
-  EDITING: 'EDITING',
+const ViewMode = {
+  COMPACT: 'COMPACT',   // режим карточки
+  EXPANDED: 'EXPANDED', // режим редактирования
 };
 
 export default class PointPresenter {
-  #pointListContainer = null;
-  #changeData = null;
-  #changeMode = null;
+  #parentContainer = null;
+  #onDataChange = null;
+  #onModeSwitch = null;
 
-  #pointComponent = null;
-  #pointEditComponent = null;
+  #cardComponent = null;      // карточка точки
+  #editComponent = null;      // форма редактирования
 
-  #point = null;
-  #destinations = null;
-  #offers = null;
-  #mode = Mode.DEFAULT;
+  #currentPoint = null;
+  #destinationsList = null;
+  #offersList = null;
+  #activeMode = ViewMode.COMPACT;
 
-  constructor(pointListContainer, changeData, changeMode) {
-    this.#pointListContainer = pointListContainer;
-    this.#changeData = changeData;
-    this.#changeMode = changeMode;
+  constructor(container, onDataUpdate, onModeChange) {
+    this.#parentContainer = container;
+    this.#onDataChange = onDataUpdate;
+    this.#onModeSwitch = onModeChange;
   }
 
-  init(point, destinations, offers) {
-    this.#point = point;
-    this.#destinations = destinations;
-    this.#offers = offers;
+  // Инициализация презентера
+  init(pointData, destinations, offers) {
+    this.#currentPoint = pointData;
+    this.#destinationsList = destinations;
+    this.#offersList = offers;
 
-    const prevPointComponent = this.#pointComponent;
-    const prevPointEditComponent = this.#pointEditComponent;
+    const previousCard = this.#cardComponent;
+    const previousForm = this.#editComponent;
 
-    this.#pointComponent = new PointView({
-      point: this.#point,
-      pointDestinations: this.#destinations,
-      pointOffers: this.#offers,
-      onEditClick: this.#handleEditClick,
-      onFavoriteClick: this.#handleFavoriteClick,
+    // Создаём карточку
+    this.#cardComponent = new PointView({
+      point: this.#currentPoint,
+      pointDestinations: this.#destinationsList,
+      pointOffers: this.#offersList,
+      onEditClick: this.#onEditClick,
+      onFavoriteClick: this.#onFavoriteToggle,
     });
 
-    this.#pointEditComponent = new EditPointView({
-      point: this.#point,
-      pointDestinations: this.#destinations,
-      pointOffers: this.#offers,
-      onFormSubmit: this.#handleFormSubmit,
-      onFormClick: this.#handleFormClick,
-      onDeleteClick: this.#handleDeleteClick,
+    // Создаём форму редактирования
+    this.#editComponent = new EditPointView({
+      point: this.#currentPoint,
+      pointDestinations: this.#destinationsList,
+      pointOffers: this.#offersList,
+      onFormSubmit: this.#onFormSend,
+      onFormClick: this.#onFormCancel,
+      onDeleteClick: this.#onDeleteConfirm,
     });
 
-    if (prevPointComponent === null || prevPointEditComponent === null) {
-      render(this.#pointComponent, this.#pointListContainer);
+    // Первичная отрисовка
+    if (previousCard === null || previousForm === null) {
+      render(this.#cardComponent, this.#parentContainer);
       return;
     }
 
-    if (this.#mode === Mode.DEFAULT) {
-      replace(this.#pointComponent, prevPointComponent);
+    // Замена существующих компонентов
+    if (this.#activeMode === ViewMode.COMPACT) {
+      replace(this.#cardComponent, previousCard);
     }
 
-    if (this.#mode === Mode.EDITING) {
-      replace(this.#pointEditComponent, prevPointEditComponent);
+    if (this.#activeMode === ViewMode.EXPANDED) {
+      replace(this.#editComponent, previousForm);
     }
 
-    remove(prevPointComponent);
-    remove(prevPointEditComponent);
+    remove(previousCard);
+    remove(previousForm);
   }
 
+  // Полное удаление презентера
   destroy() {
-    remove(this.#pointComponent);
-    remove(this.#pointEditComponent);
+    remove(this.#cardComponent);
+    remove(this.#editComponent);
   }
 
+  // Сброс в режим карточки (закрыть форму)
   resetView() {
-    if (this.#mode !== Mode.DEFAULT) {
-      this.#pointEditComponent.reset(this.#point);
-      this.#replaceFormToPoint();
+    if (this.#activeMode !== ViewMode.COMPACT) {
+      this.#editComponent.reset(this.#currentPoint);
+      this.#switchToCard();
     }
   }
 
+  // Блокировка формы во время сохранения
   setSaving() {
-    if (this.#mode === Mode.EDITING) {
-      this.#pointEditComponent.updateElement({
+    if (this.#activeMode === ViewMode.EXPANDED) {
+      this.#editComponent.updateElement({
         isDisabled: true,
         isSaving: true,
       });
     }
   }
 
+  // Блокировка формы во время удаления
   setDeleting() {
-    if (this.#mode === Mode.EDITING) {
-      this.#pointEditComponent.updateElement({
+    if (this.#activeMode === ViewMode.EXPANDED) {
+      this.#editComponent.updateElement({
         isDisabled: true,
         isDeleting: true,
       });
     }
   }
 
+  // Отображение ошибки (встряхивание компонента)
   setAborting() {
-    if (this.#mode === Mode.DEFAULT) {
-      this.#pointComponent.shake();
+    if (this.#activeMode === ViewMode.COMPACT) {
+      this.#cardComponent.shake();
       return;
     }
 
     const resetFormState = () => {
-      this.#pointEditComponent.updateElement({
+      this.#editComponent.updateElement({
         isDisabled: false,
         isSaving: false,
         isDeleting: false,
       });
     };
 
-    this.#pointEditComponent.shake(resetFormState);
+    this.#editComponent.shake(resetFormState);
   }
 
-  #replacePointToForm = () => {
-    replace(this.#pointEditComponent, this.#pointComponent);
-    document.addEventListener('keydown', this.#escKeyDownHandler);
-    this.#changeMode();
-    this.#mode = Mode.EDITING;
+  // Переключение с карточки на форму
+  #switchToForm = () => {
+    replace(this.#editComponent, this.#cardComponent);
+    document.addEventListener('keydown', this.#onDocumentKeyPress);
+    this.#onModeSwitch();
+    this.#activeMode = ViewMode.EXPANDED;
   };
 
-  #replaceFormToPoint = () => {
-    replace(this.#pointComponent, this.#pointEditComponent);
-    document.removeEventListener('keydown', this.#escKeyDownHandler);
-    this.#mode = Mode.DEFAULT;
+  // Переключение с формы на карточку
+  #switchToCard = () => {
+    replace(this.#cardComponent, this.#editComponent);
+    document.removeEventListener('keydown', this.#onDocumentKeyPress);
+    this.#activeMode = ViewMode.COMPACT;
   };
 
-  #escKeyDownHandler = (evt) => {
-    if (evt.key === 'Escape' || evt.key === 'Esc') {
-      evt.preventDefault();
-      this.#pointEditComponent.reset(this.#point);
-      this.#replaceFormToPoint();
+  // Обработчик Escape для закрытия формы
+  #onDocumentKeyPress = (event) => {
+    if (event.key === 'Escape' || event.key === 'Esc') {
+      event.preventDefault();
+      this.#editComponent.reset(this.#currentPoint);
+      this.#switchToCard();
     }
   };
 
-  #handleEditClick = () => {
-    this.#replacePointToForm();
+  // Клик по кнопке Edit
+  #onEditClick = () => {
+    this.#switchToForm();
   };
 
-  #handleFavoriteClick = () => {
-    this.#changeData(
+  // Клик по кнопке избранного
+  #onFavoriteToggle = () => {
+    this.#onDataChange(
       UserAction.UPDATE_POINT,
       UpdateType.MINOR,
-      {...this.#point, isFavorite: !this.#point.isFavorite},
+      {...this.#currentPoint, isFavorite: !this.#currentPoint.isFavorite},
     );
   };
 
-  #handleFormSubmit = (update) => {
-    const isMinorUpdate =
-      !isDatesEqual(this.#point.dateFrom, update.dateFrom) ||
-      !isDatesEqual(this.#point.dateTo, update.dateTo) ||
-      this.#point.basePrice !== update.basePrice;
+  // Отправка формы
+  #onFormSend = (updatedData) => {
+    const hasDateChanges = !areDatesEqual(this.#currentPoint.dateFrom, updatedData.dateFrom) ||
+                           !areDatesEqual(this.#currentPoint.dateTo, updatedData.dateTo);
+    const hasPriceChange = this.#currentPoint.basePrice !== updatedData.basePrice;
+    const isMinorUpdate = hasDateChanges || hasPriceChange;
 
-    this.#changeData(
+    this.#onDataChange(
       UserAction.UPDATE_POINT,
       isMinorUpdate ? UpdateType.MINOR : UpdateType.PATCH,
-      update,
+      updatedData,
     );
   };
 
-  #handleDeleteClick = (point) => {
-    this.#changeData(
+  // Удаление точки
+  #onDeleteConfirm = (pointToDelete) => {
+    this.#onDataChange(
       UserAction.DELETE_POINT,
       UpdateType.MINOR,
-      point,
+      pointToDelete,
     );
   };
 
-  #handleFormClick = () => {
-    this.#pointEditComponent.reset(this.#point);
-    this.#replaceFormToPoint();
+  // Отмена редактирования
+  #onFormCancel = () => {
+    this.#editComponent.reset(this.#currentPoint);
+    this.#switchToCard();
   };
 }
 
-function isDatesEqual(dateA, dateB) {
+// Вспомогательная функция сравнения дат
+function areDatesEqual(dateA, dateB) {
   return (dateA === null && dateB === null) || dayjs(dateA).isSame(dateB, 'D');
 }

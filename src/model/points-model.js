@@ -1,113 +1,109 @@
+// Модель для работы с точками маршрута, направлениями и предложениями
 import Observable from '../framework/observable.js';
 import {UpdateType} from '../const.js';
 
 export default class PointsModel extends Observable {
-  #pointsApiService = null;
-  #points = [];
-  #destinations = [];
-  #offers = [];
+  #apiService = null;        // сервис для запросов к API
+  #routePoints = [];         // список точек маршрута
+  #cityDestinations = [];    // список направлений (городов)
+  #availableOffers = [];     // список доступных предложений
 
   /**
-   * @param {Object} options - Options object
-   * @param {PointsApiService} options.pointsApiService - Points API service
+   * @param {Object} config - настройки модели
+   * @param {PointsApiService} config.pointsApiService - API сервис
    */
   constructor({pointsApiService}) {
     super();
-    this.#pointsApiService = pointsApiService;
+    this.#apiService = pointsApiService;
   }
 
+  // Геттеры для доступа к данным извне
   get points() {
-    return this.#points;
+    return this.#routePoints;
   }
 
   get destinations() {
-    return this.#destinations;
+    return this.#cityDestinations;
   }
 
   get offers() {
-    return this.#offers;
+    return this.#availableOffers;
   }
 
   /**
-   * Initialize model by fetching data
+   * Загрузка всех данных с сервера
    */
   async init() {
     try {
-      const points = await this.#pointsApiService.points;
-      this.#destinations = await this.#pointsApiService.destinations;
-      this.#offers = await this.#pointsApiService.offers;
-      this.#points = points.map(this.#adaptToClient);
+      const fetchedPoints = await this.#apiService.points;
+      this.#cityDestinations = await this.#apiService.destinations;
+      this.#availableOffers = await this.#apiService.offers;
+      this.#routePoints = fetchedPoints.map(this.#normalizeToClient);
       this._notify(UpdateType.INIT);
     } catch(err) {
-      this.#points = [];
-      this.#destinations = [];
-      this.#offers = [];
+      this.#routePoints = [];
+      this.#cityDestinations = [];
+      this.#availableOffers = [];
       this._notify(UpdateType.INIT, {isError: true});
     }
   }
 
   /**
-   * Update point
-   * @param {string} updateType - Update type
-   * @param {Object} update - Updated point data
+   * Обновление существующей точки
    */
-  async updatePoint(updateType, update) {
-    const index = this.#points.findIndex((point) => point.id === update.id);
+  async updatePoint(updateType, updatedData) {
+    const targetIndex = this.#routePoints.findIndex((item) => item.id === updatedData.id);
 
-    if (index === -1) {
+    if (targetIndex === -1) {
       throw new Error('Can\'t update unexisting point');
     }
 
     try {
-      const response = await this.#pointsApiService.updatePoint(update);
-      const updatedPoint = this.#adaptToClient(response);
-      this.#points = [
-        ...this.#points.slice(0, index),
-        updatedPoint,
-        ...this.#points.slice(index + 1),
+      const serverResponse = await this.#apiService.updatePoint(updatedData);
+      const normalizedPoint = this.#normalizeToClient(serverResponse);
+      this.#routePoints = [
+        ...this.#routePoints.slice(0, targetIndex),
+        normalizedPoint,
+        ...this.#routePoints.slice(targetIndex + 1),
       ];
-      this._notify(updateType, updatedPoint);
+      this._notify(updateType, normalizedPoint);
     } catch(err) {
       throw new Error('Can\'t update point');
     }
   }
 
   /**
-   * Add a new point
-   * @param {string} updateType - Update type
-   * @param {Object} update - New point data
+   * Добавление новой точки
    */
-  async addPoint(updateType, update) {
+  async addPoint(updateType, newPointData) {
     try {
-      const response = await this.#pointsApiService.addPoint(update);
-      const newPoint = this.#adaptToClient(response);
-      this.#points = [
-        newPoint,
-        ...this.#points,
+      const serverResponse = await this.#apiService.addPoint(newPointData);
+      const normalizedPoint = this.#normalizeToClient(serverResponse);
+      this.#routePoints = [
+        normalizedPoint,
+        ...this.#routePoints,
       ];
-      this._notify(updateType, newPoint);
+      this._notify(updateType, normalizedPoint);
     } catch(err) {
       throw new Error('Can\'t add point');
     }
   }
 
   /**
-   * Delete a point
-   * @param {string} updateType - Update type
-   * @param {Object} update - Point data to delete
+   * Удаление точки
    */
-  async deletePoint(updateType, update) {
-    const index = this.#points.findIndex((point) => point.id === update.id);
+  async deletePoint(updateType, pointToDelete) {
+    const targetIndex = this.#routePoints.findIndex((item) => item.id === pointToDelete.id);
 
-    if (index === -1) {
+    if (targetIndex === -1) {
       throw new Error('Can\'t delete unexisting point');
     }
 
     try {
-      await this.#pointsApiService.deletePoint(update);
-      this.#points = [
-        ...this.#points.slice(0, index),
-        ...this.#points.slice(index + 1),
+      await this.#apiService.deletePoint(pointToDelete);
+      this.#routePoints = [
+        ...this.#routePoints.slice(0, targetIndex),
+        ...this.#routePoints.slice(targetIndex + 1),
       ];
       this._notify(updateType);
     } catch(err) {
@@ -116,23 +112,21 @@ export default class PointsModel extends Observable {
   }
 
   /**
-   * Adapt server point structure to client structure
-   * @param {Object} point - Server point object
-   * @returns {Object} Client point object
+   * Приведение данных от сервера к формату клиента
    */
-  #adaptToClient = (point) => {
-    const adaptedPoint = {...point,
-      basePrice: point['base_price'],
-      dateFrom: point['date_from'] !== null ? new Date(point['date_from']) : point['date_from'],
-      dateTo: point['date_to'] !== null ? new Date(point['date_to']) : point['date_to'],
-      isFavorite: point['is_favorite'],
+  #normalizeToClient = (serverPoint) => {
+    const clientPoint = {...serverPoint,
+      basePrice: serverPoint['base_price'],
+      dateFrom: serverPoint['date_from'] !== null ? new Date(serverPoint['date_from']) : serverPoint['date_from'],
+      dateTo: serverPoint['date_to'] !== null ? new Date(serverPoint['date_to']) : serverPoint['date_to'],
+      isFavorite: serverPoint['is_favorite'],
     };
 
-    delete adaptedPoint['base_price'];
-    delete adaptedPoint['date_from'];
-    delete adaptedPoint['date_to'];
-    delete adaptedPoint['is_favorite'];
+    delete clientPoint['base_price'];
+    delete clientPoint['date_from'];
+    delete clientPoint['date_to'];
+    delete clientPoint['is_favorite'];
 
-    return adaptedPoint;
+    return clientPoint;
   };
 }

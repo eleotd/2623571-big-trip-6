@@ -1,3 +1,4 @@
+// Главный файл приложения — инициализация презентеров и моделей
 import BoardPresenter from './presenter/board-presenter.js';
 import FilterPresenter from './presenter/filter-presenter.js';
 import TripInfoPresenter from './presenter/trip-info-presenter.js';
@@ -5,54 +6,66 @@ import PointsModel from './model/points-model.js';
 import FilterModel from './model/filter-model.js';
 import PointsApiService from './points-api-service.js';
 
-const AUTHORIZATION = `Basic ${Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)}`;
-const END_POINT = 'https://24.objects.htmlacademy.pro/big-trip';
+// Настройки подключения к API
+const AUTH_KEY = `Basic ${Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)}`;
+const API_BASE_URL = 'https://24.objects.htmlacademy.pro/big-trip';
 
-const siteMainElement = document.querySelector('.page-main');
-const siteHeaderElement = document.querySelector('.page-header');
-const tripMainElement = siteHeaderElement.querySelector('.trip-main');
-const tripControlsFilters = siteHeaderElement.querySelector('.trip-controls__filters');
-const tripEventsElement = siteMainElement.querySelector('.trip-events');
+// DOM-элементы
+const mainContainer = document.querySelector('.page-main');
+const headerContainer = document.querySelector('.page-header');
+const tripHeaderSection = headerContainer.querySelector('.trip-main');
+const filtersContainer = headerContainer.querySelector('.trip-controls__filters');
+const eventsContainer = mainContainer.querySelector('.trip-events');
 
-const pointsModel = new PointsModel({
-  pointsApiService: new PointsApiService(END_POINT, AUTHORIZATION)
+// Инициализация моделей
+const pointsStore = new PointsModel({
+  pointsApiService: new PointsApiService(API_BASE_URL, AUTH_KEY)
 });
-const filterModel = new FilterModel();
+const filtersStore = new FilterModel();
 
-const tripInfoPresenter = new TripInfoPresenter({
-  tripInfoContainer: tripMainElement,
-  pointsModel,
-});
-
-const boardPresenter = new BoardPresenter({
-  boardContainer: tripEventsElement,
-  pointsModel,
-  filterModel,
+// Презентер шапки с информацией о маршруте
+const headerInfoPresenter = new TripInfoPresenter({
+  tripInfoContainer: tripHeaderSection,
+  pointsModel: pointsStore,
 });
 
-const filterPresenter = new FilterPresenter({
-  filterContainer: tripControlsFilters,
-  filterModel,
-  pointsModel,
+// Презентер доски с точками
+const boardViewPresenter = new BoardPresenter({
+  boardContainer: eventsContainer,
+  pointsModel: pointsStore,
+  filterModel: filtersStore,
 });
 
-const handleNewPointFormClose = () => {
+// Презентер фильтров
+const filterBarPresenter = new FilterPresenter({
+  filterContainer: filtersContainer,
+  filterModel: filtersStore,
+  pointsModel: pointsStore,
+});
+
+// Колбэк при закрытии формы создания новой точки
+const onNewPointFormClosed = () => {
   document.querySelector('.trip-main__event-add-btn').disabled = false;
 };
 
-const handleNewPointButtonClick = () => {
-  boardPresenter.createPoint(handleNewPointFormClose);
+// Обработчик клика по кнопке "New Event"
+const onAddButtonClick = () => {
+  boardViewPresenter.createPoint(onNewPointFormClosed);
   document.querySelector('.trip-main__event-add-btn').disabled = true;
 };
 
-// Initially disable button until data loads
-document.querySelector('.trip-main__event-add-btn').disabled = true;
-document.querySelector('.trip-main__event-add-btn').addEventListener('click', handleNewPointButtonClick);
+// Блокируем кнопку создания до загрузки данных
+const addEventButton = document.querySelector('.trip-main__event-add-btn');
+addEventButton.disabled = true;
+addEventButton.addEventListener('click', onAddButtonClick);
 
-tripInfoPresenter.init();
-filterPresenter.init();
-boardPresenter.init();
-pointsModel.init()
+// Запуск презентеров и загрузка данных
+headerInfoPresenter.init();
+filterBarPresenter.init();
+boardViewPresenter.init();
+
+// Загрузка данных с сервера
+pointsStore.init()
   .finally(() => {
-    document.querySelector('.trip-main__event-add-btn').disabled = false;
+    addEventButton.disabled = false;
   });

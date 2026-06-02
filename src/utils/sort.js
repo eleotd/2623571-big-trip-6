@@ -1,36 +1,41 @@
+// Утилиты для сортировки точек маршрута
 import dayjs from 'dayjs';
 
-function getWeightForNullDate(dateA, dateB) {
-  if (dateA === null && dateB === null) {
+// Вспомогательная функция для обработки null-значений в датах
+function getNullDateWeight(dateLeft, dateRight) {
+  if (dateLeft === null && dateRight === null) {
     return 0;
   }
 
-  if (dateA === null) {
+  if (dateLeft === null) {
     return 1;
   }
 
-  if (dateB === null) {
+  if (dateRight === null) {
     return -1;
   }
 
   return null;
 }
 
-function sortPointDay(pointA, pointB) {
-  const weight = getWeightForNullDate(pointA.dateFrom, pointB.dateFrom);
+// Сортировка по дате начала (от ранней к поздней)
+function sortPointDay(itemA, itemB) {
+  const weight = getNullDateWeight(itemA.dateFrom, itemB.dateFrom);
 
-  return weight ?? dayjs(pointA.dateFrom).diff(dayjs(pointB.dateFrom));
+  return weight ?? dayjs(itemA.dateFrom).diff(dayjs(itemB.dateFrom));
 }
 
-function sortPointTime(pointA, pointB) {
-  const durationA = dayjs(pointA.dateTo).diff(dayjs(pointA.dateFrom));
-  const durationB = dayjs(pointB.dateTo).diff(dayjs(pointB.dateFrom));
+// Сортировка по длительности (от большей к меньшей)
+function sortPointTime(itemA, itemB) {
+  const durationOfA = dayjs(itemA.dateTo).diff(dayjs(itemA.dateFrom));
+  const durationOfB = dayjs(itemB.dateTo).diff(dayjs(itemB.dateFrom));
 
-  return durationB - durationA;
+  return durationOfB - durationOfA;
 }
 
-function sortPointPrice(pointA, pointB) {
-  return pointB.basePrice - pointA.basePrice;
+// Сортировка по цене (от большей к меньшей)
+function sortPointPrice(itemA, itemB) {
+  return itemB.basePrice - itemA.basePrice;
 }
 
 export {sortPointDay, sortPointTime, sortPointPrice};

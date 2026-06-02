@@ -1,61 +1,71 @@
+// Утилиты для форматирования дат и расчёта длительности
 import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
 
 dayjs.extend(duration);
 
-const DATE_FORMAT = 'MMM D';
-const TIME_FORMAT = 'HH:mm';
-const FULL_DATE_FORMAT = 'DD/MM/YY HH:mm';
+// Константы форматов
+const SHORT_DATE_PATTERN = 'MMM D';
+const SHORT_TIME_PATTERN = 'HH:mm';
+const LONG_DATE_PATTERN = 'DD/MM/YY HH:mm';
 
-function humanizePointDate(date) {
-  return date ? dayjs(date).format(DATE_FORMAT) : '';
+// Форматирование даты (день + месяц)
+function humanizePointDate(rawDate) {
+  return rawDate ? dayjs(rawDate).format(SHORT_DATE_PATTERN) : '';
 }
 
-function humanizePointTime(date) {
-  return date ? dayjs(date).format(TIME_FORMAT) : '';
+// Форматирование времени (часы + минуты)
+function humanizePointTime(rawDate) {
+  return rawDate ? dayjs(rawDate).format(SHORT_TIME_PATTERN) : '';
 }
 
-function humanizeFullDate(date) {
-  return date ? dayjs(date).format(FULL_DATE_FORMAT) : '';
+// Полное форматирование даты
+function humanizeFullDate(rawDate) {
+  return rawDate ? dayjs(rawDate).format(LONG_DATE_PATTERN) : '';
 }
 
-function getPointDuration(dateFrom, dateTo) {
-  const start = dayjs(dateFrom);
-  const end = dayjs(dateTo);
-  const diff = end.diff(start);
-  const durationObj = dayjs.duration(diff);
+// Расчёт длительности между двумя датами (формат: 01D 02H 30M)
+function getPointDuration(startDate, endDate) {
+  const startMoment = dayjs(startDate);
+  const endMoment = dayjs(endDate);
+  const diffMs = endMoment.diff(startMoment);
+  const durationObj = dayjs.duration(diffMs);
 
-  const days = Math.floor(durationObj.asDays());
-  const hours = durationObj.hours();
-  const minutes = durationObj.minutes();
+  const totalDays = Math.floor(durationObj.asDays());
+  const totalHours = durationObj.hours();
+  const totalMinutes = durationObj.minutes();
 
-  let formattedDuration = '';
+  let result = '';
 
-  if (days > 0) {
-    formattedDuration += `${String(days).padStart(2, '0')}D `;
-    formattedDuration += `${String(hours).padStart(2, '0')}H `;
-    formattedDuration += `${String(minutes).padStart(2, '0')}M`;
-  } else if (hours > 0) {
-    formattedDuration += `${String(hours).padStart(2, '0')}H `;
-    formattedDuration += `${String(minutes).padStart(2, '0')}M`;
+  if (totalDays > 0) {
+    result += `${String(totalDays).padStart(2, '0')}D `;
+    result += `${String(totalHours).padStart(2, '0')}H `;
+    result += `${String(totalMinutes).padStart(2, '0')}M`;
+  } else if (totalHours > 0) {
+    result += `${String(totalHours).padStart(2, '0')}H `;
+    result += `${String(totalMinutes).padStart(2, '0')}M`;
   } else {
-    formattedDuration += `${String(minutes).padStart(2, '0')}M`;
+    result += `${String(totalMinutes).padStart(2, '0')}M`;
   }
 
-  return formattedDuration;
+  return result;
 }
 
-function formatTripDates(dateFrom, dateTo) {
-  const start = dayjs(dateFrom);
-  const end = dayjs(dateTo);
+// Форматирование диапазона дат для шапки маршрута
+function formatTripDates(fromDate, toDate) {
+  const from = dayjs(fromDate);
+  const to = dayjs(toDate);
 
-  if (start.isSame(end, 'month')) {
-    return `${start.format('D')}&nbsp;&mdash;&nbsp;${end.format('D MMM')}`;
+  // Если в пределах одного месяца
+  if (from.isSame(to, 'month')) {
+    return `${from.format('D')}&nbsp;&mdash;&nbsp;${to.format('D MMM')}`;
   }
 
-  return `${start.format('D MMM')}&nbsp;&mdash;&nbsp;${end.format('D MMM')}`;
+  // Разные месяцы
+  return `${from.format('D MMM')}&nbsp;&mdash;&nbsp;${to.format('D MMM')}`;
 }
 
+// Экспорт всех функций
 export {
   humanizePointDate,
   humanizePointTime,

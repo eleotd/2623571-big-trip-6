@@ -1,89 +1,95 @@
+// Презентер блока с информацией о путешествии (маршрут, даты, стоимость)
 import TripInfoView from '../view/trip-info-view.js';
 import {render, remove, RenderPosition, replace} from '../framework/render.js';
 import {sortPointDay} from '../utils/sort.js';
 import {formatTripDates} from '../utils/date.js';
 
 export default class TripInfoPresenter {
-  #tripInfoContainer = null;
-  #pointsModel = null;
-  #tripInfoComponent = null;
+  #container = null;        // контейнер для шапки маршрута
+  #pointsStore = null;      // модель точек
+  #infoWidget = null;       // компонент информации
 
   constructor({tripInfoContainer, pointsModel}) {
-    this.#tripInfoContainer = tripInfoContainer;
-    this.#pointsModel = pointsModel;
+    this.#container = tripInfoContainer;
+    this.#pointsStore = pointsModel;
 
-    this.#pointsModel.addObserver(this.#handleModelEvent);
+    this.#pointsStore.addObserver(this.#onStoreUpdate);
   }
 
+  // Инициализация / обновление информации
   init() {
-    const points = this.#pointsModel.points;
+    const allPoints = this.#pointsStore.points;
 
-    if (points.length === 0) {
-      if (this.#tripInfoComponent) {
-        remove(this.#tripInfoComponent);
-        this.#tripInfoComponent = null;
+    // Если точек нет — удаляем компонент
+    if (allPoints.length === 0) {
+      if (this.#infoWidget) {
+        remove(this.#infoWidget);
+        this.#infoWidget = null;
       }
       return;
     }
 
-    const sortedPoints = [...points].sort(sortPointDay);
-    const tripInfo = this.#calculateTripInfo(sortedPoints);
+    const sortedByDay = [...allPoints].sort(sortPointDay);
+    const tripData = this.#buildTripSummary(sortedByDay);
 
-    const prevTripInfoComponent = this.#tripInfoComponent;
+    const previousWidget = this.#infoWidget;
 
-    this.#tripInfoComponent = new TripInfoView({tripInfo});
+    this.#infoWidget = new TripInfoView({tripInfo: tripData});
 
-    if (prevTripInfoComponent === null) {
-      render(this.#tripInfoComponent, this.#tripInfoContainer, RenderPosition.AFTERBEGIN);
+    if (previousWidget === null) {
+      render(this.#infoWidget, this.#container, RenderPosition.AFTERBEGIN);
       return;
     }
 
-    replace(this.#tripInfoComponent, prevTripInfoComponent);
-    remove(prevTripInfoComponent);
+    replace(this.#infoWidget, previousWidget);
+    remove(previousWidget);
   }
 
-  #handleModelEvent = () => {
+  // Реакция на изменение модели
+  #onStoreUpdate = () => {
     this.init();
   };
 
-  #calculateTripInfo(points) {
-    const startPoint = points[0];
-    const endPoint = points[points.length - 1];
+  // Формирование данных для шапки: маршрут, даты, стоимость
+  #buildTripSummary(points) {
+    const firstPoint = points[0];
+    const lastPoint = points[points.length - 1];
 
-    // Route
-    const cityNames = points.map((point) => {
-      const destination = this.#pointsModel.destinations.find((dest) => dest.id === point.destination);
-      return destination ? destination.name : '';
+    // --- Маршрут (список городов) ---
+    const cityNamesList = points.map((point) => {
+      const matchedDestination = this.#pointsStore.destinations.find((dest) => dest.id === point.destination);
+      return matchedDestination ? matchedDestination.name : '';
     });
 
-    let routeTitle = '';
-    if (cityNames.length > 3) {
-      routeTitle = `${cityNames[0]} &mdash; ... &mdash; ${cityNames[cityNames.length - 1]}`;
+    let routeText = '';
+    if (cityNamesList.length > 3) {
+      routeText = `${cityNamesList[0]} &mdash; ... &mdash; ${cityNamesList[cityNamesList.length - 1]}`;
     } else {
-      routeTitle = cityNames.join(' &mdash; ');
+      routeText = cityNamesList.join(' &mdash; ');
     }
 
-    // Dates
-    const dates = formatTripDates(startPoint.dateFrom, endPoint.dateTo);
+    // --- Даты ---
+    const dateRange = formatTripDates(firstPoint.dateFrom, lastPoint.dateTo);
 
-    // Cost
-    let totalCost = 0;
+    // --- Общая стоимость (базовая цена + выбранные предложения) ---
+    let totalSum = 0;
 
     points.forEach((point) => {
-      totalCost += point.basePrice;
+      totalSum += point.basePrice;
 
-      const offers = this.#pointsModel.offers.find((o) => o.type === point.type)?.offers || [];
-      const selectedOffers = offers.filter((offer) => point.offers.includes(offer.id));
+      const offerGroup = this.#pointsStore.offers.find((item) => item.type === point.type);
+      const availableOffers = offerGroup?.offers || [];
+      const chosenOffers = availableOffers.filter((offer) => point.offers.includes(offer.id));
 
-      selectedOffers.forEach((offer) => {
-        totalCost += offer.price;
+      chosenOffers.forEach((offer) => {
+        totalSum += offer.price;
       });
     });
 
     return {
-      title: routeTitle,
-      dates: dates,
-      cost: totalCost
+      title: routeText,
+      dates: dateRange,
+      cost: totalSum
     };
   }
 }

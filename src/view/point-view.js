@@ -1,25 +1,26 @@
+// Представление карточки события (точки маршрута)
 import AbstractView from '../framework/view/abstract-view.js';
 import {humanizePointDate, humanizePointTime, getPointDuration} from '../utils/date.js';
 
-function createPointTemplate(point, destinations, offers) {
-  const {basePrice, dateFrom, dateTo, isFavorite, type} = point;
-  const pointDestination = destinations.find((dest) => dest.id === point.destination);
-  const pointTypeOffers = offers.find((offer) => offer.type === type);
-  const pointOffers = pointTypeOffers ? pointTypeOffers.offers : [];
-  const selectedOffers = pointOffers.filter((offer) => point.offers.includes(offer.id));
+// Генерация HTML карточки события
+function buildEventCardTemplate(eventData, destinationsList, offersList) {
+  const {basePrice, dateFrom, dateTo, isFavorite, type} = eventData;
 
-  const favoriteClassName = isFavorite
-    ? 'event__favorite-btn--active'
-    : '';
+  const matchedDestination = destinationsList.find((dest) => dest.id === eventData.destination);
+  const offersByType = offersList.find((offer) => offer.type === type);
+  const availableOffers = offersByType ? offersByType.offers : [];
+  const selectedOffers = availableOffers.filter((offer) => eventData.offers.includes(offer.id));
 
-  return (
-    `<li class="trip-events__item">
+  const favoriteClass = isFavorite ? 'event__favorite-btn--active' : '';
+
+  return `
+    <li class="trip-events__item">
       <div class="event">
         <time class="event__date" datetime="${dateFrom}">${humanizePointDate(dateFrom)}</time>
         <div class="event__type">
           <img class="event__type-icon" width="42" height="42" src="img/icons/${type}.png" alt="Event type icon">
         </div>
-        <h3 class="event__title">${type} ${pointDestination ? pointDestination.name : ''}</h3>
+        <h3 class="event__title">${type} ${matchedDestination ? matchedDestination.name : ''}</h3>
         <div class="event__schedule">
           <p class="event__time">
             <time class="event__start-time" datetime="${dateFrom}">${humanizePointTime(dateFrom)}</time>
@@ -41,7 +42,7 @@ function createPointTemplate(point, destinations, offers) {
             </li>
           `).join('')}
         </ul>
-        <button class="event__favorite-btn ${favoriteClassName}" type="button">
+        <button class="event__favorite-btn ${favoriteClass}" type="button">
           <span class="visually-hidden">Add to favorite</span>
           <svg class="event__favorite-icon" width="28" height="28" viewBox="0 0 28 28">
             <path d="M14 21l-8.22899 4.3262 1.57159-9.1631L.685209 9.67376 9.8855 8.33688 14 0l4.1145 8.33688 9.2003 1.33688-6.6574 6.48934 1.5716 9.1631L14 21z"/>
@@ -51,40 +52,41 @@ function createPointTemplate(point, destinations, offers) {
           <span class="visually-hidden">Open event</span>
         </button>
       </div>
-    </li>`
-  );
+    </li>`;
 }
 
 export default class PointView extends AbstractView {
-  #point = null;
-  #pointDestinations = null;
-  #pointOffers = null;
-  #handleEditClick = null;
-  #handleFavoriteClick = null;
+  #eventData = null;
+  #storedDestinations = null;
+  #storedOffers = null;
+  #onEditTrigger = null;
+  #onFavoriteTrigger = null;
 
   constructor({point, pointDestinations, pointOffers, onEditClick, onFavoriteClick}) {
     super();
-    this.#point = point;
-    this.#pointDestinations = pointDestinations;
-    this.#pointOffers = pointOffers;
-    this.#handleEditClick = onEditClick;
-    this.#handleFavoriteClick = onFavoriteClick;
+    this.#eventData = point;
+    this.#storedDestinations = pointDestinations;
+    this.#storedOffers = pointOffers;
+    this.#onEditTrigger = onEditClick;
+    this.#onFavoriteTrigger = onFavoriteClick;
 
-    this.element.querySelector('.event__rollup-btn').addEventListener('click', this.#editClickHandler);
-    this.element.querySelector('.event__favorite-btn').addEventListener('click', this.#favoriteClickHandler);
+    this.element.querySelector('.event__rollup-btn').addEventListener('click', this.#onEdit);
+    this.element.querySelector('.event__favorite-btn').addEventListener('click', this.#onFavorite);
   }
 
   get template() {
-    return createPointTemplate(this.#point, this.#pointDestinations, this.#pointOffers);
+    return buildEventCardTemplate(this.#eventData, this.#storedDestinations, this.#storedOffers);
   }
 
-  #editClickHandler = (evt) => {
+  // Открытие формы редактирования
+  #onEdit = (evt) => {
     evt.preventDefault();
-    this.#handleEditClick();
+    this.#onEditTrigger();
   };
 
-  #favoriteClickHandler = (evt) => {
+  // Переключение избранного
+  #onFavorite = (evt) => {
     evt.preventDefault();
-    this.#handleFavoriteClick();
+    this.#onFavoriteTrigger();
   };
 }
