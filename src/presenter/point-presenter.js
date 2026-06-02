@@ -6,8 +6,8 @@ import {UserAction, UpdateType} from '../const.js';
 import dayjs from 'dayjs';
 
 const ViewMode = {
-  COMPACT: 'COMPACT',   // режим карточки
-  EXPANDED: 'EXPANDED', // режим редактирования
+  COMPACT: 'COMPACT',
+  EXPANDED: 'EXPANDED',
 };
 
 export default class PointPresenter {
@@ -15,8 +15,8 @@ export default class PointPresenter {
   #onDataChange = null;
   #onModeSwitch = null;
 
-  #cardComponent = null;      // карточка точки
-  #editComponent = null;      // форма редактирования
+  #cardComponent = null;
+  #editComponent = null;
 
   #currentPoint = null;
   #destinationsList = null;

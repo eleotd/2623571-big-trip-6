@@ -5,9 +5,9 @@ import {sortPointDay} from '../utils/sort.js';
 import {formatTripDates} from '../utils/date.js';
 
 export default class TripInfoPresenter {
-  #container = null;        // контейнер для шапки маршрута
-  #pointsStore = null;      // модель точек
-  #infoWidget = null;       // компонент информации
+  #container = null;
+  #pointsStore = null;
+  #infoWidget = null;
 
   constructor({tripInfoContainer, pointsModel}) {
     this.#container = tripInfoContainer;
