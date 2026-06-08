@@ -35,9 +35,11 @@ const FilterOptions = {
   PAST: 'past',
 };
 
-// Экспорт для обратной совместимости (сохраняем старые имена для импортов)
-export const POINT_TYPES = EVENT_TYPES;
-export const SortType = SortOptions;
-export const UserAction = UserActivity;
-export const UpdateType = RefreshType;
-export const FilterType = FilterOptions;
+// Единый экспорт
+export {
+  EVENT_TYPES as POINT_TYPES,
+  SortOptions as SortType,
+  UserActivity as UserAction,
+  RefreshType as UpdateType,
+  FilterOptions as FilterType,
+};

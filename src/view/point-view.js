@@ -6,7 +6,7 @@ import {humanizePointDate, humanizePointTime, getPointDuration} from '../utils/d
 function buildEventCardTemplate(eventData, destinationsList, offersList) {
   const {basePrice, dateFrom, dateTo, isFavorite, type} = eventData;
 
-  const matchedDestination = destinationsList.find((dest) => dest.id === eventData.destination);
+  const matchedDestination = destinationsList.find((destination) => destination.id === eventData.destination);
   const offersByType = offersList.find((offer) => offer.type === type);
   const availableOffers = offersByType ? offersByType.offers : [];
   const selectedOffers = availableOffers.filter((offer) => eventData.offers.includes(offer.id));

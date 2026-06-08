@@ -6,9 +6,15 @@ import PointsModel from './model/points-model.js';
 import FilterModel from './model/filter-model.js';
 import PointsApiService from './points-api-service.js';
 
-// Настройки подключения к API
-const AUTH_KEY = `Basic ${Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)}`;
+// Константы для магических значений
+const AUTH_PREFIX = 'Basic';
+const RANDOM_STRING_LENGTH = 15;
 const API_BASE_URL = 'https://24.objects.htmlacademy.pro/big-trip';
+
+// Генерация случайного ключа
+const generateRandomString = (length) => Math.random().toString(36).substring(2, 2 + length);
+
+const AUTH_KEY = `${AUTH_PREFIX} ${generateRandomString(RANDOM_STRING_LENGTH)}${generateRandomString(RANDOM_STRING_LENGTH)}`;
 
 // DOM-элементы
 const mainContainer = document.querySelector('.page-main');
@@ -45,19 +51,27 @@ const filterBarPresenter = new FilterPresenter({
 
 // Колбэк при закрытии формы создания новой точки
 const onNewPointFormClosed = () => {
-  document.querySelector('.trip-main__event-add-btn').disabled = false;
+  const addButton = document.querySelector('.trip-main__event-add-btn');
+  if (addButton) {
+    addButton.disabled = false;
+  }
 };
 
 // Обработчик клика по кнопке "New Event"
 const onAddButtonClick = () => {
   boardViewPresenter.createPoint(onNewPointFormClosed);
-  document.querySelector('.trip-main__event-add-btn').disabled = true;
+  const addButton = document.querySelector('.trip-main__event-add-btn');
+  if (addButton) {
+    addButton.disabled = true;
+  }
 };
 
 // Блокируем кнопку создания до загрузки данных
 const addEventButton = document.querySelector('.trip-main__event-add-btn');
-addEventButton.disabled = true;
-addEventButton.addEventListener('click', onAddButtonClick);
+if (addEventButton) {
+  addEventButton.disabled = true;
+  addEventButton.addEventListener('click', onAddButtonClick);
+}
 
 // Запуск презентеров и загрузка данных
 headerInfoPresenter.init();
@@ -67,5 +81,7 @@ boardViewPresenter.init();
 // Загрузка данных с сервера
 pointsStore.init()
   .finally(() => {
-    addEventButton.disabled = false;
+    if (addEventButton) {
+      addEventButton.disabled = false;
+    }
   });

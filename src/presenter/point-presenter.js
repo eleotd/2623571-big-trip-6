@@ -10,6 +10,10 @@ const ViewMode = {
   EXPANDED: 'EXPANDED',
 };
 
+function areDatesEqual(dateA, dateB) {
+  return (dateA === null && dateB === null) || dayjs(dateA).isSame(dateB, 'D');
+}
+
 export default class PointPresenter {
   #parentContainer = null;
   #onDataChange = null;
@@ -194,9 +198,4 @@ export default class PointPresenter {
     this.#editComponent.reset(this.#currentPoint);
     this.#switchToCard();
   };
-}
-
-// Вспомогательная функция сравнения дат
-function areDatesEqual(dateA, dateB) {
-  return (dateA === null && dateB === null) || dayjs(dateA).isSame(dateB, 'D');
 }

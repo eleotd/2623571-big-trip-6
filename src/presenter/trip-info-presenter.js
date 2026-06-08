@@ -4,6 +4,9 @@ import {render, remove, RenderPosition, replace} from '../framework/render.js';
 import {sortPointDay} from '../utils/sort.js';
 import {formatTripDates} from '../utils/date.js';
 
+// Константа для максимального количества городов перед сокращением маршрута
+const MAX_CITIES_BEFORE_TRUNCATE = 3;
+
 export default class TripInfoPresenter {
   #container = null;
   #pointsStore = null;
@@ -57,12 +60,12 @@ export default class TripInfoPresenter {
 
     // --- Маршрут (список городов) ---
     const cityNamesList = points.map((point) => {
-      const matchedDestination = this.#pointsStore.destinations.find((dest) => dest.id === point.destination);
+      const matchedDestination = this.#pointsStore.destinations.find((destination) => destination.id === point.destination);
       return matchedDestination ? matchedDestination.name : '';
     });
 
     let routeText = '';
-    if (cityNamesList.length > 3) {
+    if (cityNamesList.length > MAX_CITIES_BEFORE_TRUNCATE) {
       routeText = `${cityNamesList[0]} &mdash; ... &mdash; ${cityNamesList[cityNamesList.length - 1]}`;
     } else {
       routeText = cityNamesList.join(' &mdash; ');

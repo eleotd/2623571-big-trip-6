@@ -21,7 +21,7 @@ function buildEditFormTemplate(formState, destinationsList, offersList) {
   const {basePrice, dateFrom, dateTo, type, isDisabled, isSaving, isDeleting, id} = formState;
   const uniqueSuffix = id || 'new';
 
-  const matchedDestination = destinationsList.find((dest) => dest.id === formState.destination);
+  const matchedDestination = destinationsList.find((destination) => destination.id === formState.destination);
   const offersByType = offersList.find((offer) => offer.type === type);
   const currentOffers = offersByType ? offersByType.offers : [];
 
@@ -53,7 +53,7 @@ function buildEditFormTemplate(formState, destinationsList, offersList) {
   }).join('');
 
   // Выпадающий список направлений
-  const destinationOptions = destinationsList.map((dest) => `<option value="${dest.name}"></option>`).join('');
+  const destinationOptions = destinationsList.map((destination) => `<option value="${destination.name}"></option>`).join('');
 
   // Галерея фотографий направления
   const photosMarkup = destPictures.map((pic) => `
@@ -229,7 +229,7 @@ export default class EditPointView extends AbstractStatefulView {
 
   #onDestinationSelect = (evt) => {
     evt.preventDefault();
-    const selected = this.#cachedDestinations.find((dest) => dest.name === evt.target.value);
+    const selected = this.#cachedDestinations.find((destination) => destination.name === evt.target.value);
 
     if (!selected) {
       evt.target.value = '';
